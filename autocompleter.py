@@ -65,13 +65,7 @@ def runAutoCompleter(driver: ChromiumDriver):
     while course_in_progress:
         page_title = driver.find_element(By.CLASS_NAME, "course-title").text.lower()
         if not page_title.startswith("new york osha/pesh annual refresher"):
-            if page_title.startswith("exam agreement"):
-                iAgree_btn = driver.find_element(By.ID, "iAgree")
-                iAgree_btn.click()
-                save_btn = driver.find_element(By.ID, "saveBtn")
-                save_btn.click()
-            else:
-                print("This does not appear to be the OSHA course. This program currently only works with OSHA training.")   
+            print("This does not appear to be the OSHA course. This program currently only works with OSHA training.")   
             course_in_progress = False  
             return
         
