@@ -40,10 +40,11 @@ def main():
         return
     
     driver.get(url)
+    print(sep)
 
     run = True
     while run:
-        decision = prompt("Open the training session, then press \"Enter\" to run the script. Type \"Exit\" to end: ", completer=WordCompleter(["Exit"])).lower()
+        decision = prompt("Open the training session, then press \"Enter\" to run the script. Type \"Exit\" to end: ", completer=WordCompleter(["Exit"], ignore_case=True)).lower()
         if decision == "exit":
             run = False
         if run:
@@ -57,15 +58,24 @@ def runAutoCompleter(driver: ChromiumDriver):
     current_time = int(time.time())
     print(f"\t{'- Start time:' : <35}{time.ctime() : <35}")
     completion_percent = findCompletionPercent(driver)
+    if completion_percent == -1:
+        errorMsg()
+        return
     remaining_percent = 100-completion_percent
     complete_time = (remaining_percent * 60) + current_time
     print(f"\t{'- Estimated completion time:' : <35}{time.ctime(complete_time) : <35}")
     
     course_in_progress = True
     while course_in_progress:
+        try:
+            driver.find_element(By.CLASS_NAME, "course-title").text.lower()
+        except:
+            errorMsg()
+            course_in_progress = False  
+            return
         page_title = driver.find_element(By.CLASS_NAME, "course-title").text.lower()
         if not page_title.startswith("new york osha/pesh annual refresher"):
-            print("This does not appear to be the OSHA course. This program currently only works with OSHA training.")   
+            errorMsg()   
             course_in_progress = False  
             return
         
@@ -109,7 +119,15 @@ def introMessage():
     print(sep)
     return
 
+def errorMsg():
+    print("\nThis does not appear to be the OSHA course. This program currently only works with OSHA training.")   
+    return
+
 def findCompletionPercent(driver: ChromiumDriver):
+    try:
+        driver.find_element(By.XPATH, '//*[@id="courseProgress-item"]/div/div/div/span')
+    except:
+        return -1
     bar = driver.find_element(By.XPATH, '//*[@id="courseProgress-item"]/div/div/div/span')
     text = bar.get_attribute("innerHTML")
     percent = int(text.split("%")[0])
