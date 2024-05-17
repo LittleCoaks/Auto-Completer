@@ -1,10 +1,8 @@
 # Platform Auto-Completer
 This program will automatically click through OSHA assignment slides so you don't have to!
 
-Currently, the executable is only available for Windows. However, this is only a simple python script. Anyone can use this with the correct setup steps.
-
-## Windows
-It's recommended to simply use the `autoclicker.exe` file for Windows.
+## Windows & Mac
+Download the files attached in the Latest Release
 
 ## Mac, Linux, or any other OS
 Follow these steps to use on any other operatine system
