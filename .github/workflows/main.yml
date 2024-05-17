@@ -26,7 +26,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: "AutoCompleter-Windows"
-          path: dist/
+          path: dist/autocompleter/autocompleter.exe
 
   macOS:
     name: "AutoCompleter-macOS"
@@ -49,4 +49,4 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: "AutoCompleter-macOS"
-          path: dist/
+          path: dist/autocompleter/autocompleter
