@@ -1,5 +1,5 @@
 # Platform Auto-Completer
-This program will automatically click through assignment slides so you don't have to!
+This program will automatically click through OSHA assignment slides so you don't have to!
 
 Currently, the executable is only available for Windows. However, this is only a simple python script. Anyone can use this with the correct setup steps.
 
