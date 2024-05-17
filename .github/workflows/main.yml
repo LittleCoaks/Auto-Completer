@@ -20,13 +20,13 @@ jobs:
           pip install pyinstaller
       - name: Build with PyInstaller
         run: |
-          pyinstaller autocompleter.py
+          pyinstaller --onefile autocompleter.py
       - name: Publish
         if: success()
         uses: actions/upload-artifact@v2
         with:
           name: "AutoCompleter-Windows"
-          path: dist/autocompleter/autocompleter.exe
+          path: dist/autocompleter.exe
 
   macOS:
     name: "AutoCompleter-macOS"
@@ -43,10 +43,10 @@ jobs:
           pip install pyinstaller
       - name: Build with PyInstaller
         run: |
-          pyinstaller autocompleter.py
+          pyinstaller --onefile autocompleter.py
       - name: Publish
         if: success()
         uses: actions/upload-artifact@v2
         with:
           name: "AutoCompleter-macOS"
-          path: dist/autocompleter/autocompleter
+          path: dist/autocompleter
