@@ -21,6 +21,12 @@ jobs:
     - name: build with pyinstaller
       run: |
         pyinstaller autocompleter.py
+    - name: "Publish"
+      if: success()
+      uses: actions/upload-artifact@v2-preview
+      with:
+        name: "AutoCompleter-Windows"
+        path: "./artifact/"
 
   macOS:
     name: "AutoCompleter-macOS"
@@ -38,3 +44,9 @@ jobs:
     - name: build with pyinstaller
       run: |
         pyinstaller autocompleter.py
+    - name: "Publish"
+      if: success()
+      uses: actions/upload-artifact@v2-preview
+      with:
+        name: "AutoCompleter-macOS"
+        path: "./artifact/"
