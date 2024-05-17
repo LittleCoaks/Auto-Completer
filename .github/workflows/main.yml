@@ -17,7 +17,10 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller
+          pip install pyinstaller selenium prompt_toolkit
+      - name: Verify installed packages
+        run: |
+          pip list
       - name: Build with PyInstaller
         run: |
           pyinstaller --onefile autocompleter.py
@@ -40,7 +43,10 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller
+          pip install pyinstaller selenium prompt_toolkit
+      - name: Verify installed packages
+        run: |
+          pip list
       - name: Build with PyInstaller
         run: |
           pyinstaller --onefile autocompleter.py
