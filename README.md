@@ -1,4 +1,4 @@
-# Auto-Completer
+# Assignment Auto-Completer
 This program will automatically complete assignments so you don't have to! It works by going through each one and getting you to the end of the course; however it does *not* do the final exam at the end of the course. That still must be done manually.
 
 ## Windows & Mac
