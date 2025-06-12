@@ -9,15 +9,15 @@ jobs:
     name: "AutoCompleter-Windows"
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: 3.12
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller selenium prompt_toolkit
+          pip install pyinstaller selenium prompt_toolkit openai bs4
       - name: Verify installed packages
         run: |
           pip list
@@ -26,7 +26,7 @@ jobs:
           pyinstaller --onefile autocompleter.py
       - name: Publish
         if: success()
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: "AutoCompleter-Windows"
           path: dist/autocompleter.exe
@@ -35,15 +35,15 @@ jobs:
     name: "AutoCompleter-macOS"
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: 3.12
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller selenium prompt_toolkit
+          pip install pyinstaller selenium prompt_toolkit openai bs4
       - name: Verify installed packages
         run: |
           pip list
@@ -52,7 +52,7 @@ jobs:
           pyinstaller --onefile autocompleter.py
       - name: Publish
         if: success()
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: "AutoCompleter-macOS"
           path: dist/autocompleter
