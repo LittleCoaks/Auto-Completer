@@ -1,50 +1,59 @@
+import os
 import time
 from enum import Enum
 import concurrent.futures
+import warnings
+warnings.filterwarnings(
+    "ignore",
+    category=RuntimeWarning,
+    module=r"trio\._core\._multierror"
+)
 
 # selenium
 from selenium import webdriver
 from selenium.webdriver.chromium.webdriver import ChromiumDriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+#from selenium.common.exceptions import WebDriverException
 
 # prompt
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import WordCompleter
 
+# chatgpt
+import openai
+from bs4 import BeautifulSoup
+
+
 sep = "\n-----------------------------\n"
 
 # user configs
 # manually type this info here if you don't want to have to do it yourself upon running the program
-preferred_browser = ""
 username = ""
 password = ""
 show_time = None
 watch_videos = None
+openai_api_key = ""
 
 class slideType(Enum):
     unknown = 0
     standard = 1
     question = 2
     question_osha = 3
+    user_agreement = 4
+    exam = 5
+    warning = 6
 
 def main():
-    global preferred_browser
     global username
     global password
     global show_time
     global watch_videos
 
     introMessage()
-
-    while preferred_browser == "":
-        browser_list = ["Chrome", "Edge", "Firefox", "Safari", "Internet Explorer"]
-        browser_completer = WordCompleter(browser_list, ignore_case=True)
-        preferred_browser = prompt(f"Enter your preferred browser {browser_list}: ", completer=browser_completer).lower()
-        if preferred_browser not in (browser.lower() for browser in browser_list):
-            print("\nERROR:\tplease re-enter your choice.")
-            preferred_browser = ""
-
-    print()
 
     if username == "":
         username = prompt(f"Enter your username/email: ")
@@ -62,7 +71,7 @@ def main():
         show_time_str = prompt(show_time_msg, completer=show_time_completer).lower()
         if show_time_str == "yes" or show_time_str == "y":
             show_time = True
-        elif show_time_str == "no" or show_time_str == "no":
+        elif show_time_str == "no" or show_time_str == "n":
             show_time = False
         else:
             show_time = None
@@ -88,17 +97,17 @@ def main():
     print(sep)
     print("The program will now begin. Please do not close this window or any browser window.")
     print(sep)
-    
-    preferred_driver = getPreferredDriver(preferred_browser)
+
+    driver = getDriver()
 
     print("Runtime information:")
     starting_time = time.perf_counter()
     print(f"{'- Start time:' : <25}{time.ctime() : <25}")
     print(sep)
 
-    if not login(preferred_driver):
+    if not login(driver):
         return
-    runAutoCompleter(preferred_driver)
+    runAutoCompleter(driver)
 
     print(sep)
     ending_time = time.perf_counter()
@@ -116,47 +125,38 @@ def main():
 
 
 
-def getPreferredDriver(preferred_browser: str):
-    preferred_driver = ChromiumDriver
+def getDriver():
+    # only supporting Chrome from now on, the other ones are too annoying plus no one's using anything else
+    options = webdriver.ChromeOptions()
+    options.add_argument("--log-level=3")
+    options.add_argument('--ignore-certificate-errors')
+    options.add_argument('--ignore-ssl-errors')
+    options.add_experimental_option('excludeSwitches', ['enable-logging'])
+    options.add_experimental_option("detach", True)
     
-    if preferred_browser == "chrome":
-        chrome_options = webdriver.ChromeOptions()
-        chrome_options.add_argument("--log-level=3")
-        chrome_options.add_argument('--ignore-certificate-errors')
-        chrome_options.add_argument('--ignore-ssl-errors')
-        chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
-        preferred_driver = webdriver.Chrome(options=chrome_options)
+    chrome_install = ChromeDriverManager().install()
+    folder = os.path.dirname(chrome_install)
+    chromedriver_path = os.path.join(folder, "chromedriver.exe")
+    service = Service(chromedriver_path)
 
-    elif preferred_browser == "edge":
-        edge_options = webdriver.EdgeOptions()
-        edge_options.add_argument("--log-level=3")
-        edge_options.add_argument('--ignore-certificate-errors')
-        edge_options.add_argument('--ignore-ssl-errors')
-        edge_options.add_experimental_option('excludeSwitches', ['enable-logging'])
-        preferred_driver = webdriver.Edge(options=edge_options)
+    return webdriver.Chrome(service=service, options=options)
 
-    elif preferred_browser == "firefox":
-        firefox_options = webdriver.FirefoxOptions()
-        firefox_options.add_argument("--log-level=3")
-        firefox_options.add_argument('--ignore-certificate-errors')
-        firefox_options.add_argument('--ignore-ssl-errors')
-        preferred_driver = webdriver.Firefox(options=firefox_options)
 
-    elif preferred_browser == "safari":
-        safari_options = webdriver.SafariOptions()
-        safari_options.add_argument("--log-level=3")
-        safari_options.add_argument('--ignore-certificate-errors')
-        safari_options.add_argument('--ignore-ssl-errors')
-        preferred_driver = webdriver.Edge(options=edge_options)
 
-    elif preferred_browser == "internet explorer":
-        ie_options = webdriver.IeOptions()
-        ie_options.add_argument("--log-level=3")
-        ie_options.add_argument('--ignore-certificate-errors')
-        ie_options.add_argument('--ignore-ssl-errors')
-        preferred_driver = webdriver.Ie(options=ie_options)
+def expand_shadow_element(driver, element):
+    return driver.execute_script('return arguments[0].shadowRoot', element)
 
-    return preferred_driver
+def get_nested_shadow_element(driver, selectors):
+    """
+    selectors: list of (By, value) tuples, each pointing to the next shadow root element
+    """
+    parent = driver
+    for by, selector in selectors:
+        # wait for the element inside shadow dom or document
+        WebDriverWait(driver, 10).until(lambda d: parent.find_element(by, selector))
+        parent = parent.find_element(by, selector)
+        parent = expand_shadow_element(driver, parent)
+    return parent
 
 
 
@@ -172,7 +172,14 @@ def login(driver: ChromiumDriver):
 
     # open My Assignments
     try:
-        driver.find_element(By.XPATH, '//*[@id="navLeft"]/ul/li[2]/a/span').click()
+        sidenav = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "vwc-sidenav#sidenav"))
+        )
+        sidenav_shadow = expand_shadow_element(driver, sidenav)
+        assignment_item = sidenav_shadow.find_element(By.CSS_SELECTOR, "vwc-item#vwc-sidenav-item-19_1_6")
+        item_shadow = expand_shadow_element(driver, assignment_item)
+        link = item_shadow.find_element(By.CSS_SELECTOR, "a#item")
+        driver.execute_script("arguments[0].click();", link)
         return True
     except:
         print("Login attempt failed. Please restart the program and ensure username/password is entered correctly.")
@@ -183,7 +190,10 @@ def login(driver: ChromiumDriver):
 
 def runAutoCompleter(driver: ChromiumDriver) -> int:
     # Find Next Assignment
-    assignments = driver.find_element(By.XPATH, '//*[@id="content"]/table').find_elements(By.TAG_NAME, "tr")
+    table = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.XPATH, '//*[@id="banner-content-section"]/table'))
+    )
+    assignments = table.find_elements(By.TAG_NAME, "tr")
 
     print("Assignment Info:")
     
@@ -199,36 +209,38 @@ def completeAssignment(new_assignment_number: int):
     global show_time
     global watch_videos
 
-    this_driver = getPreferredDriver(preferred_browser)
+    this_driver = getDriver()
     login(this_driver)
 
     try:
-        assignments = this_driver.find_element(By.XPATH, '//*[@id="content"]/table').find_elements(By.TAG_NAME, "tr")
+        table = WebDriverWait(this_driver, 10).until(
+            EC.presence_of_element_located((By.XPATH, '//*[@id="banner-content-section"]/table'))
+        )
+        assignments = table.find_elements(By.TAG_NAME, "tr")
         this_assignment = assignments[new_assignment_number].find_element(By.XPATH, ".//a")
         assignment_name = this_assignment.text
         is_osha = assignment_name.lower().startswith("new york osha")
+        answers = ""
         
         this_assignment.click() # open next assignment
 
         print(f"-\tStarted: -- {assignment_name}")
         
-        completion_percent = findCompletionPercent(this_driver)
-        remaining_percent = 100-completion_percent
-        
         course_in_progress = True
         while course_in_progress:
+            completion_percent = findCompletionPercent(this_driver)
+            remaining_percent = 100-completion_percent
             time_per_slide = 1
-            if show_time and not is_osha:
-                time_per_slide = 30 # seconds
-
-            if is_osha:
-                completion_percent = findCompletionPercent(this_driver)
-                remaining_percent = 100-completion_percent
-                if completion_percent != 100:
-                    if remaining_percent > 10:
-                        time_per_slide = 600 # 10 minutes
-                    else:
-                        time_per_slide = remaining_percent * 60
+            
+            if completion_percent == -1:
+                if show_time:
+                    time_per_slide = 30 # seconds
+            
+            elif completion_percent != 100:
+                if remaining_percent > 10:
+                    time_per_slide = 600 # 10 minutes
+                else:
+                    time_per_slide = remaining_percent * 60
             
             # check if this is a video slide
             if watch_videos:
@@ -244,36 +256,86 @@ def completeAssignment(new_assignment_number: int):
                 time.sleep(1)
             
             slide_type = slideType.standard
-            try:
-                this_driver.find_elements(By.CLASS_NAME, "tf_course1")
-            except:
-                slide_type = slideType.unknown
             slide_name = this_driver.find_elements(By.CLASS_NAME, "tf_course1")
-            if len(slide_name) > 0:
+            if this_driver.find_elements(By.XPATH, '//h1[text()="User Agreement"]'):
+                slide_type = slideType.user_agreement
+            elif this_driver.find_elements(By.XPATH, '//*[@id="body"]/div/div[1]/div/div[1][text()="Warning"]'):
+                slide_type = slideType.warning
+            elif len(slide_name) > 0:
                 if slide_name[0].text.lower().startswith("study exercise"):
                     if is_osha:
                         slide_type = slideType.question_osha
                     else:
                         slide_type = slideType.question
+            else:
+                if this_driver.find_elements(By.XPATH, '//div[@class="header" and normalize-space(text())="Exam Agreement"]'):
+                    slide_type = slideType.exam
+                else:
+                    slide_type = slideType.unknown
             
             match slide_type:
                 case slideType.standard:
                     this_driver.find_element(By.ID, "nextA").click()
                 case slideType.question:
                     correct_modal_info = determineCorrectModal(this_driver)
-                    next_slide_command = correct_modal_info[0].find_element(By.CLASS_NAME, correct_modal_info[1]).get_attribute("onclick")
-                    this_driver.execute_script(next_slide_command)
+                    if correct_modal_info[0]:
+                        next_slide_command = correct_modal_info[0].find_element(By.CLASS_NAME, correct_modal_info[1]).get_attribute("onclick")
+                        this_driver.execute_script(next_slide_command)
+                    else:
+                        answer = slide_name[0].find_element(By.CSS_SELECTOR, '[href]:not([href="#"])')
+                        answer.click()
+                        alert = this_driver.switch_to.alert
+                        alert.accept()
                 case slideType.question_osha:
                     this_driver.execute_script("document.myform.submit()")
+                case slideType.exam:
+                    if openai_api_key != "":
+                        this_driver.find_element(By.ID, "iAgree").click()
+                        this_driver .find_element(By.ID, "saveBtn").click()
+                        exam_html = this_driver.find_element(By.CLASS_NAME, "examList").get_attribute('innerHTML')
+                        answers = answerExam(exam_html)
+                    course_in_progress = False
+                case slideType.user_agreement:
+                    this_driver.find_element(By.ID, "agree").click()
+                case slideType.warning:
+                    this_driver.find_element(By.ID, "backBtn").click()
                 case slideType.unknown:
                     course_in_progress = False
 
-        this_driver.close()
         print(f"-\t***Completed: -- {assignment_name}***")
-
+        if answers != "":
+            print(f"-\tExam Answers:\t{answers}")
+        else:
+            this_driver.close() # don't close page if there's an exam. each new time opening the exam changes the quesitons
     except:
         print(f"-\t!!!Some error occured: -- {assignment_name}!!!")
         this_driver.close()
+
+
+
+def answerExam(exam_html):
+    soup = BeautifulSoup(exam_html, 'html.parser')
+    output = []
+    questions = soup.find_all('li', class_='examQuestion')
+    options = soup.find_all('li', class_='examOptions')
+    for i in range(len(questions)):
+        question_text = questions[i].get_text(strip=True)
+        output.append(question_text)
+        answers = options[i].find_all('li')
+        for j, ans in enumerate(answers):
+            answer_text = ans.get_text(strip=True)
+            output.append(f"    {chr(65 + j)}. {answer_text}")
+    exam_string = '\n'.join(output)
+
+    client = openai.OpenAI(api_key=openai_api_key)
+    response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[
+            {"role": "system", "content": "You will receive an exam. Correctly answer the questions and respond only with a comma-seperated list of the answers by letter in the order of the questions."},
+            {"role": "user", "content": exam_string}
+        ]
+    )
+    return response.choices[0].message.content
 
 
 
